@@ -41,8 +41,8 @@ class ExpenseService:
         return expense
 
     @staticmethod
-    def get_all_expenses(db: Session) -> list[Expense]:
-        return db.query(Expense).all()
+    def get_all_expenses(db: Session, current_user: User) -> list[Expense]:
+        return db.query(Expense).filter(Expense.user_id == current_user.id).all()
 
     @staticmethod
     def get_expenses_by_user(db: Session, user_id: int) -> list[Expense]:

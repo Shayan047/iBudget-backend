@@ -3,20 +3,22 @@ from sqlalchemy.orm import Session
 from typing import List
 
 from app.database import get_db
+from app.models import User
 from .schema import ExpenseCreate, ExpenseUpdate, ExpenseResponse
 from .service import ExpenseService
+from app.dependencies import get_current_user
 
 router = APIRouter(prefix="/expenses", tags=["Expenses"])
 
 
 @router.post("/", response_model=ExpenseResponse, status_code=201)
-def create_expense(expense: ExpenseCreate, db: Session = Depends(get_db)):
+def create_expense(expense: ExpenseCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     return ExpenseService.create_expense(db, expense)
 
 
 @router.get("/", response_model=List[ExpenseResponse])
-def get_all_expenses(db: Session = Depends(get_db)):
-    return ExpenseService.get_all_expenses(db)
+def get_all_expenses(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return ExpenseService.get_all_expenses(db, current_user.id)
 
 
 @router.get("/user/{user_id}", response_model=List[ExpenseResponse])
