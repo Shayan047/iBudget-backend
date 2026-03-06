@@ -4,6 +4,7 @@ from app.modules.expense.api import router as expense_router
 from app.modules.category.api import router as category_router
 from app.modules.income.api import router as income_router
 from app.modules.budget.api import router as budget_router
+from app.modules.auth.api import router as auth_router
 
 app = FastAPI(
     title="iBudget APIs",
@@ -12,6 +13,7 @@ app = FastAPI(
     docs_url="/api",
 )
 
+app.include_router(auth_router)
 app.include_router(user_router)
 app.include_router(expense_router)
 app.include_router(category_router)
