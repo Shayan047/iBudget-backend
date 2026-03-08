@@ -8,7 +8,6 @@ from typing import List, Optional
 # =========================
 
 class ExpenseCreate(BaseModel):
-    user_id: int
     category_id: int
     amount: float
     date: Optional[datetime] = None

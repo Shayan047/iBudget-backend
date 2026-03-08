@@ -13,12 +13,12 @@ router = APIRouter(prefix="/expenses", tags=["Expenses"])
 
 @router.post("/", response_model=ExpenseResponse, status_code=201)
 def create_expense(expense: ExpenseCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    return ExpenseService.create_expense(db, expense)
+    return ExpenseService.create_expense(db, expense, current_user)
 
 
 @router.get("/", response_model=List[ExpenseResponse])
 def get_all_expenses(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    return ExpenseService.get_all_expenses(db, current_user.id)
+    return ExpenseService.get_all_expenses(db, current_user)
 
 
 @router.get("/user/{user_id}", response_model=List[ExpenseResponse])
