@@ -26,29 +26,30 @@ class ExpenseService:
 
         return new_expense
 
+
     @staticmethod
-    def get_expense_by_id(db: Session, expense_id: int) -> Expense:
-        expense = db.query(Expense).filter(Expense.id == expense_id).first()
+    def get_all_expenses(db: Session, current_user: User) -> list[Expense]:
+        return db.query(Expense).filter(Expense.user_id == current_user.id).all()
+    
+    @staticmethod
+    def get_expense_by_id(db: Session, expense_id: int, current_user: User) -> Expense:
+        expense = db.query(Expense).filter(
+            Expense.id == expense_id,
+            Expense.user_id == current_user.id
+        ).first()
+
         if not expense:
             raise HTTPException(status_code=404, detail="Expense not found")
 
         return expense
 
-    @staticmethod
-    def get_all_expenses(db: Session, current_user: User) -> list[Expense]:
-        return db.query(Expense).filter(Expense.user_id == current_user.id).all()
 
     @staticmethod
-    def get_expenses_by_user(db: Session, user_id: int) -> list[Expense]:
-        user = db.query(User).filter(User.id == user_id).first()
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
-
-        return db.query(Expense).options(joinedload(Expense.category)).filter(Expense.user_id == user_id).all()
-
-    @staticmethod
-    def update_expense(db: Session, expense_id: int, expense_data: ExpenseUpdate) -> Expense:
-        expense = db.query(Expense).filter(Expense.id == expense_id).first()
+    def update_expense(db: Session, expense_id: int, expense_data: ExpenseUpdate, current_user: User) -> Expense:
+        expense = db.query(Expense).filter(
+            Expense.id == expense_id,
+            Expense.user_id == current_user.id
+        ).first()
         if not expense:
             raise HTTPException(status_code=404, detail="Expense not found")
 
@@ -69,11 +70,17 @@ class ExpenseService:
 
         return expense
 
+
     @staticmethod
-    def delete_expense(db: Session, expense_id: int) -> None:
-        expense = db.query(Expense).filter(Expense.id == expense_id).first()
+    def delete_expense(db: Session, expense_id: int, current_user: User) -> None:
+        expense = db.query(Expense).filter(
+            Expense.id == expense_id,
+            Expense.user_id == current_user.id
+        ).first()
         if not expense:
             raise HTTPException(status_code=404, detail="Expense not found")
 
         db.delete(expense)
         db.commit()
+
+        return {"status": "Success", "message": "Expense deleted successfully"}
