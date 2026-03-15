@@ -21,21 +21,16 @@ def get_all_expenses(db: Session = Depends(get_db), current_user: User = Depends
     return ExpenseService.get_all_expenses(db, current_user)
 
 
-@router.get("/user/{user_id}", response_model=List[ExpenseResponse])
-def get_expenses_by_user(user_id: int, db: Session = Depends(get_db)):
-    return ExpenseService.get_expenses_by_user(db, user_id)
-
-
 @router.get("/{expense_id}", response_model=ExpenseResponse)
-def get_expense(expense_id: int, db: Session = Depends(get_db)):
-    return ExpenseService.get_expense_by_id(db, expense_id)
+def get_expense(expense_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return ExpenseService.get_expense_by_id(db, expense_id, current_user)
 
 
 @router.patch("/{expense_id}", response_model=ExpenseResponse)
-def update_expense(expense_id: int, expense: ExpenseUpdate, db: Session = Depends(get_db)):
-    return ExpenseService.update_expense(db, expense_id, expense)
+def update_expense(expense_id: int, expense: ExpenseUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return ExpenseService.update_expense(db, expense_id, expense, current_user)
 
 
-@router.delete("/{expense_id}", status_code=204)
-def delete_expense(expense_id: int, db: Session = Depends(get_db)):
-    ExpenseService.delete_expense(db, expense_id)
+@router.delete("/{expense_id}", status_code=200)
+def delete_expense(expense_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return ExpenseService.delete_expense(db, expense_id, current_user)
