@@ -11,9 +11,7 @@ security = HTTPBearer()
 
 def get_current_user(token: str = Depends(security), db: Session = Depends(get_db)) -> User:
     try:
-        print('test')
-        print(f"Decoded user ID from token: {decode_token(token)}")  # Debugging statement
-        user_id = decode_token(token)
+        user_id = decode_token(token.credentials)
         user = db.query(User).filter(User.id == user_id).first()
         if not user:
             raise HTTPException(status_code=404, detail="User not found")

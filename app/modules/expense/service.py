@@ -8,19 +8,13 @@ from .schema import ExpenseCreate, ExpenseUpdate
 class ExpenseService:
 
     @staticmethod
-    def create_expense(db: Session, expense_data: ExpenseCreate) -> Expense:
-        # Validate user exists
-        user = db.query(User).filter(User.id == expense_data.user_id).first()
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
-
-        # Validate category exists
+    def create_expense(db: Session, expense_data: ExpenseCreate, current_user: User) -> Expense:
         category = db.query(Category).filter(Category.id == expense_data.category_id).first()
         if not category:
             raise HTTPException(status_code=404, detail="Category not found")
 
         new_expense = Expense(
-            user_id=expense_data.user_id,
+            user_id=current_user.id,
             category_id=expense_data.category_id,
             amount=expense_data.amount,
             **({"date": expense_data.date} if expense_data.date else {}),

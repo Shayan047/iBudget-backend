@@ -26,5 +26,4 @@ def create_refresh_token(user_id: int) -> str:
 
 def decode_token(token: str) -> int:
     payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-    print('test 2')
     return int(payload.get("sub"))

@@ -12,11 +12,9 @@ class AuthService:
     @staticmethod
     def login_user(db: Session, user_data: UserLogin) -> User:
         user = db.query(User).filter(User.email == user_data.email).first()
-        if not user:
-            raise HTTPException(status_code=400, detail="Email not registered")
         
-        if not verify_password(user_data.password, user.password):
-            raise HTTPException(status_code=400, detail="Incorrect password")
+        if not user or not verify_password(user_data.password, user.password):
+            raise HTTPException(status_code=400, detail="Invalid credentials")
 
         return {
             "user": user,
