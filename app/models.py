@@ -12,24 +12,15 @@ from sqlalchemy import (
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
-# =========================
-# Base
-# =========================
 class Base(DeclarativeBase):
     pass
 
 
-# =========================
-# Enum
-# =========================
 class SharedExpenseStatus(str, Enum):
     paid = "paid"
     pending = "pending"
 
 
-# =========================
-# User
-# =========================
 class User(Base):
     __tablename__ = "users"
 
@@ -46,9 +37,6 @@ class User(Base):
     shared_expense_users: Mapped[list["SharedExpenseUser"]] = relationship(back_populates="user", cascade="all, delete")
 
 
-# =========================
-# Income
-# =========================
 class Income(Base):
     __tablename__ = "incomes"
 
@@ -61,9 +49,6 @@ class Income(Base):
     taxes: Mapped[list["Tax"]] = relationship(back_populates="income", cascade="all, delete")
 
 
-# =========================
-# Budget
-# =========================
 class Budget(Base):
     __tablename__ = "budgets"
 
@@ -75,9 +60,6 @@ class Budget(Base):
     user: Mapped["User"] = relationship(back_populates="budgets")
 
 
-# =========================
-# Category
-# =========================
 class Category(Base):
     __tablename__ = "categories"
 
@@ -93,9 +75,6 @@ class Category(Base):
     expenses: Mapped[list["Expense"]] = relationship(back_populates="category", cascade="all, delete")
 
 
-# =========================
-# Expense
-# =========================
 class Expense(Base):
     __tablename__ = "expenses"
 
@@ -111,9 +90,6 @@ class Expense(Base):
     shared_expenses: Mapped[list["SharedExpense"]] = relationship(back_populates="expense", cascade="all, delete")
 
 
-# =========================
-# Tax
-# =========================
 class Tax(Base):
     __tablename__ = "taxes"
 
@@ -135,9 +111,6 @@ class Tax(Base):
     income: Mapped["Income"] = relationship(back_populates="taxes")
 
 
-# =========================
-# SharedExpense
-# =========================
 class SharedExpense(Base):
     __tablename__ = "shared_expenses"
 
@@ -160,9 +133,6 @@ class SharedExpense(Base):
     )
 
 
-# =========================
-# SharedExpenseUser
-# =========================
 class SharedExpenseUser(Base):
     __tablename__ = "shared_expense_users"
 

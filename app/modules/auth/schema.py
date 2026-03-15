@@ -13,16 +13,21 @@ class UserLogin(UserBase):
     pass
 
 
-class AuthResponse(BaseModel):
+class UserOut(BaseModel):
     id: int
-    email: EmailStr
+    email: str
     name: str
+
+    model_config = {"from_attributes": True}
+
+class AuthTokens(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
 
-    class Config:
-        from_attributes = True
+class RegisterResponse(BaseModel):
+    user: UserOut
+    auth: AuthTokens
 
 
 class RefreshRequest(BaseModel):
