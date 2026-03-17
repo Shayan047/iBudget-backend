@@ -4,7 +4,6 @@ from typing import List, Optional
 
 
 class IncomeCreate(BaseModel):
-    user_id: int
     amount: float
     date: Optional[datetime] = None
 

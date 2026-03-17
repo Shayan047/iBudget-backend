@@ -3,13 +3,18 @@ from fastapi import HTTPException
 
 from app.models import Category, User
 from .schema import CategoryCreate, CategoryUpdate
-
+from sqlalchemy import or_
 
 class CategoryService:
 
     @staticmethod
     def get_all_categories(db: Session, current_user: User) -> list[Category]:
-        return db.query(Category).filter(Category.created_by_user_id == current_user.id).all()
+        return db.query(Category).filter(
+            or_(
+                Category.created_by_user_id == current_user.id,
+                Category.created_by_user_id == None
+            )
+        ).all()
 
 
     @staticmethod

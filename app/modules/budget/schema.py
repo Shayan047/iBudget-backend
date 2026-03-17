@@ -4,9 +4,8 @@ from typing import List, Optional
 
 
 class BudgetCreate(BaseModel):
-    user_id: int
     amount: float
-    date: Optional[datetime] = None
+    date: datetime
 
 
 class BudgetUpdate(BaseModel):
