@@ -4,7 +4,6 @@ from typing import List, Optional
 
 class CategoryCreate(BaseModel):
     name: str
-    created_by_user_id: Optional[int] = None
 
 
 class CategoryUpdate(BaseModel):
