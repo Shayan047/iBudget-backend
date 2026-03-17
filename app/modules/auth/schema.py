@@ -20,15 +20,10 @@ class UserOut(BaseModel):
 
     model_config = {"from_attributes": True}
 
-class AuthTokens(BaseModel):
+class Auth(BaseModel):
     access_token: str
-    refresh_token: str
     token_type: str = "bearer"
 
-class RegisterResponse(BaseModel):
+class AuthResponse(BaseModel):
     user: UserOut
-    auth: AuthTokens
-
-
-class RefreshRequest(BaseModel):
-    refresh_token: str
+    auth: Auth | None = None
