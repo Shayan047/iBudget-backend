@@ -13,20 +13,21 @@ class BudgetService:
 
     @staticmethod
     def get_budget_by_id(db: Session, budget_id: int, current_user: User) -> Budget:
-        budget = db.query(Budget).filter(
-            Budget.id == budget_id,
-            Budget.user_id == current_user.id
-        ).first()
+        budget = (
+            db.query(Budget)
+            .filter(Budget.id == budget_id, Budget.user_id == current_user.id)
+            .first()
+        )
         if not budget:
             raise HTTPException(status_code=404, detail="Budget not found")
         return budget
 
     @staticmethod
-    def create_budget(db: Session, budget_data: BudgetCreate, current_user: User) -> Budget:
+    def create_budget(
+        db: Session, budget_data: BudgetCreate, current_user: User
+    ) -> Budget:
         budget = Budget(
-            user_id=current_user.id,
-            amount=budget_data.amount,
-            date=budget_data.date
+            user_id=current_user.id, amount=budget_data.amount, date=budget_data.date
         )
         db.add(budget)
         db.commit()
@@ -34,11 +35,14 @@ class BudgetService:
         return budget
 
     @staticmethod
-    def update_budget(db: Session, budget_id: int, budget_data: BudgetUpdate, current_user: User) -> Budget:
-        budget = db.query(Budget).filter(
-            Budget.id == budget_id,
-            Budget.user_id == current_user.id
-        ).first()
+    def update_budget(
+        db: Session, budget_id: int, budget_data: BudgetUpdate, current_user: User
+    ) -> Budget:
+        budget = (
+            db.query(Budget)
+            .filter(Budget.id == budget_id, Budget.user_id == current_user.id)
+            .first()
+        )
         if not budget:
             raise HTTPException(status_code=404, detail="Budget not found")
 
@@ -53,10 +57,11 @@ class BudgetService:
 
     @staticmethod
     def delete_budget(db: Session, budget_id: int, current_user: User) -> None:
-        budget = db.query(Budget).filter(
-            Budget.id == budget_id,
-            Budget.user_id == current_user.id
-        ).first()
+        budget = (
+            db.query(Budget)
+            .filter(Budget.id == budget_id, Budget.user_id == current_user.id)
+            .first()
+        )
         if not budget:
             raise HTTPException(status_code=404, detail="Budget not found")
 

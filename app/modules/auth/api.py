@@ -7,6 +7,7 @@ from .service import AuthService
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
+
 @router.post("/register", response_model=AuthResponse)
 def register_user(user: UserRegister, db: Session = Depends(get_db)):
     return AuthService.register_user(db, user)

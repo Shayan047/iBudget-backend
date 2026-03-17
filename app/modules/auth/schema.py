@@ -1,5 +1,6 @@
 from pydantic import BaseModel, EmailStr
 
+
 class UserBase(BaseModel):
     email: EmailStr
     password: str
@@ -20,9 +21,11 @@ class UserOut(BaseModel):
 
     model_config = {"from_attributes": True}
 
+
 class Auth(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
 
 class AuthResponse(BaseModel):
     user: UserOut
