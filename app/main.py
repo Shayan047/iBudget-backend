@@ -31,6 +31,7 @@ app.include_router(income_router)
 app.include_router(budget_router)
 app.include_router(dashboard_router)
 
+
 @app.get("/")
 def read_root():
     return {"message": "FastAPI with PostgreSQL + Docker is working!"}

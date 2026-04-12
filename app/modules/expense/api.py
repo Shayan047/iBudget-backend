@@ -4,33 +4,90 @@ from typing import List
 
 from app.database import get_db
 from app.models import User
-from .schema import ExpenseCreate, ExpenseUpdate, ExpenseResponse
-from .service import ExpenseService
 from app.dependencies import get_current_user
+from .service import ExpenseService
+from .schema import (
+    ExpenseCreate,
+    ExpenseUpdate,
+    SharedExpenseCreate,
+    SharedExpenseUserUpdate,
+    ExpenseSummaryResponse,
+    ExpenseDetailResponse,
+)
 
 router = APIRouter(prefix="/expenses", tags=["Expenses"])
 
-
-@router.post("/", response_model=ExpenseResponse, status_code=201)
-def create_expense(expense: ExpenseCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    return ExpenseService.create_expense(db, expense, current_user)
+# ── Personal expenses ─────────────────────────────────────────
 
 
-@router.get("/", response_model=List[ExpenseResponse])
-def get_all_expenses(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+@router.get("/", response_model=List[ExpenseSummaryResponse])
+def get_all_expenses(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     return ExpenseService.get_all_expenses(db, current_user)
 
 
-@router.get("/{expense_id}", response_model=ExpenseResponse)
-def get_expense(expense_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+@router.get("/{expense_id}", response_model=ExpenseDetailResponse)
+def get_expense(
+    expense_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     return ExpenseService.get_expense_by_id(db, expense_id, current_user)
 
 
-@router.patch("/{expense_id}", response_model=ExpenseResponse)
-def update_expense(expense_id: int, expense: ExpenseUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    return ExpenseService.update_expense(db, expense_id, expense, current_user)
+@router.post("/", response_model=ExpenseDetailResponse, status_code=201)
+def create_expense(
+    data: ExpenseCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return ExpenseService.create_expense(db, data, current_user)
+
+
+@router.patch("/{expense_id}", response_model=ExpenseDetailResponse)
+def update_expense(
+    expense_id: int,
+    data: ExpenseUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return ExpenseService.update_expense(db, expense_id, data, current_user)
 
 
 @router.delete("/{expense_id}", status_code=200)
-def delete_expense(expense_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def delete_expense(
+    expense_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     return ExpenseService.delete_expense(db, expense_id, current_user)
+
+
+# ── Shared expenses ───────────────────────────────────────────
+
+
+@router.post("/shared", response_model=ExpenseDetailResponse, status_code=201)
+def create_shared_expense(
+    data: SharedExpenseCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return ExpenseService.create_shared_expense(db, data, current_user)
+
+
+@router.patch(
+    "/{expense_id}/participants/{participant_id}",
+    response_model=ExpenseDetailResponse,
+)
+def update_participant_status(
+    expense_id: int,
+    participant_id: int,
+    data: SharedExpenseUserUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return ExpenseService.update_participant_status(
+        db, expense_id, participant_id, data, current_user
+    )
