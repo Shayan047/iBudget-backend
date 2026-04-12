@@ -1,40 +1,117 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from datetime import datetime
-from typing import List, Optional
+from typing import List
+from app.models import SharedExpenseStatus
 
 
-# =========================
-# Expense Schemas
-# =========================
-
-class ExpenseCreate(BaseModel):
-    category_id: int
-    amount: float
-    date: Optional[datetime] = None
+# ── Category ──────────────────────────────────────────────────
 
 
-class ExpenseUpdate(BaseModel):
-    category_id: Optional[int] = None
-    amount: Optional[float] = None
-    date: Optional[datetime] = None
-
-class CategoryJoinedResponse(BaseModel):
+class CategoryResponse(BaseModel):
     id: int
     name: str
 
     class Config:
         from_attributes = True
 
-class ExpenseResponse(BaseModel):
+
+# ── Tax ───────────────────────────────────────────────────────
+
+
+class TaxResponse(BaseModel):
     id: int
-    user_id: int
     amount: float
-    date: datetime
-    category: CategoryJoinedResponse
 
     class Config:
         from_attributes = True
 
 
-class ExpenseListResponse(BaseModel):
-    expenses: List[ExpenseResponse]
+# ── Personal expense ──────────────────────────────────────────
+
+
+class ExpenseCreate(BaseModel):
+    category_id: int
+    amount: float
+    description: str | None = None
+    date: datetime | None = None
+
+
+class ExpenseUpdate(BaseModel):
+    category_id: int | None = None
+    amount: float | None = None
+    description: str | None = None
+    date: datetime | None = None
+
+
+# ── Shared expense ────────────────────────────────────────────
+
+
+class SharedExpenseUserCreate(BaseModel):
+    email: EmailStr
+    amount: float
+
+
+class SharedExpenseCreate(BaseModel):
+    category_id: int
+    total_amount: float
+    my_share: float
+    description: str | None = None
+    date: datetime | None = None
+    users: List[SharedExpenseUserCreate]
+
+
+class SharedExpenseUserUpdate(BaseModel):
+    status: SharedExpenseStatus
+    amount: float | None = None
+
+
+# ── Responses ─────────────────────────────────────────────────
+
+
+class ParticipantResponse(BaseModel):
+    id: int
+    user_id: int
+    user_name: str | None
+    user_email: str | None
+    amount: float
+    tax_amount: float | None
+    status: SharedExpenseStatus
+    is_creator: bool
+
+    class Config:
+        from_attributes = True
+
+
+class ExpenseSummaryResponse(BaseModel):
+    id: int
+    description: str | None
+    my_amount: float
+    date: datetime
+    category: CategoryResponse | None
+    is_shared: bool
+    is_creator: bool | None = None  # None for personal, True/False for shared
+    status: SharedExpenseStatus | None = None  # None for personal
+
+    class Config:
+        from_attributes = True
+
+
+class ExpenseDetailResponse(BaseModel):
+    """Used in GET /{id} detail view"""
+
+    id: int
+    description: str | None
+    date: datetime
+    category: CategoryResponse | None
+    is_shared: bool
+    tax: TaxResponse | None
+
+    # Personal only
+    amount: float | None = None
+
+    # Shared only
+    total_amount: float | None = None
+    participants: List[ParticipantResponse] | None = None
+
+    class Config:
+        from_attributes = True
