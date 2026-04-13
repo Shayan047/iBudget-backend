@@ -60,12 +60,19 @@ class SharedExpenseCreate(BaseModel):
     users: List[SharedExpenseUserCreate]
 
 
-class SharedExpenseUserUpdate(BaseModel):
+class SharedExpenseUserUpdateItem(BaseModel):
+    email: EmailStr
+    amount: float
     status: SharedExpenseStatus
-    amount: float | None = None
 
 
-# ── Responses ─────────────────────────────────────────────────
+class SharedExpenseUpdate(BaseModel):
+    category_id: int | None = None
+    total_amount: float | None = None
+    my_share: float | None = None
+    description: str | None = None
+    date: datetime | None = None
+    users: List[SharedExpenseUserUpdateItem] | None = None
 
 
 class ParticipantResponse(BaseModel):
@@ -89,27 +96,21 @@ class ExpenseSummaryResponse(BaseModel):
     date: datetime
     category: CategoryResponse | None
     is_shared: bool
-    is_creator: bool | None = None  # None for personal, True/False for shared
-    status: SharedExpenseStatus | None = None  # None for personal
+    is_creator: bool | None = None
+    status: SharedExpenseStatus | None = None
 
     class Config:
         from_attributes = True
 
 
 class ExpenseDetailResponse(BaseModel):
-    """Used in GET /{id} detail view"""
-
     id: int
     description: str | None
     date: datetime
     category: CategoryResponse | None
     is_shared: bool
     tax: TaxResponse | None
-
-    # Personal only
     amount: float | None = None
-
-    # Shared only
     total_amount: float | None = None
     participants: List[ParticipantResponse] | None = None
 
