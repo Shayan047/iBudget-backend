@@ -14,19 +14,16 @@ from .schema import (
     ExpenseCreate,
     ExpenseUpdate,
     SharedExpenseCreate,
-    SharedExpenseUserUpdate,
+    SharedExpenseUpdate,
 )
 
 
 class ExpenseService:
 
-    # ── Get all (summary list) ────────────────────────────────────
-
     @staticmethod
     def get_all_expenses(db: Session, current_user: User) -> list:
         results = []
 
-        # 1. Personal expenses (not shared)
         personal = (
             db.query(Expense)
             .filter(
@@ -49,7 +46,6 @@ class ExpenseService:
                 }
             )
 
-        # 2. Shared expenses (as creator OR participant)
         shared_entries = (
             db.query(SharedExpenseUser)
             .filter(SharedExpenseUser.user_id == current_user.id)
@@ -65,14 +61,12 @@ class ExpenseService:
                     "date": exp.date,
                     "category": exp.category,
                     "is_shared": True,
-                    "is_creator": entry.is_creator,  # ← added
-                    "status": entry.status,  # ← added
+                    "is_creator": entry.is_creator,
+                    "status": entry.status,
                 }
             )
 
         return results
-
-    # ── Get single expense detail ─────────────────────────────────
 
     @staticmethod
     def get_expense_by_id(db: Session, expense_id: int, current_user: User) -> dict:
@@ -81,7 +75,6 @@ class ExpenseService:
             raise HTTPException(status_code=404, detail="Expense not found")
 
         if expense.is_shared:
-            # Verify user is creator or participant
             entry = (
                 db.query(SharedExpenseUser)
                 .filter(
@@ -97,8 +90,6 @@ class ExpenseService:
             if expense.user_id != current_user.id:
                 raise HTTPException(status_code=403, detail="Not authorized")
             return ExpenseService._format_personal_detail(expense)
-
-    # ── Create personal expense ───────────────────────────────────
 
     @staticmethod
     def create_expense(db: Session, data: ExpenseCreate, current_user: User) -> dict:
@@ -119,13 +110,10 @@ class ExpenseService:
         db.refresh(expense)
         return ExpenseService._format_personal_detail(expense)
 
-    # ── Create shared expense ─────────────────────────────────────
-
     @staticmethod
     def create_shared_expense(
         db: Session, data: SharedExpenseCreate, current_user: User
     ) -> dict:
-        # Step 1 — Validate all participant emails exist first
         participants = []
         for entry in data.users:
             user = db.query(User).filter(User.email == entry.email).first()
@@ -136,7 +124,6 @@ class ExpenseService:
                 )
             participants.append((user, entry.amount))
 
-        # Step 2 — Validate shares add up to total
         total_shares = round(data.my_share + sum(u.amount for u in data.users), 2)
         if total_shares != round(data.total_amount, 2):
             raise HTTPException(
@@ -144,12 +131,10 @@ class ExpenseService:
                 detail=f"Shares ({total_shares}) do not match total amount ({data.total_amount})",
             )
 
-        # Step 3 — Validate category
         category = db.query(Category).filter(Category.id == data.category_id).first()
         if not category:
             raise HTTPException(status_code=404, detail="Category not found")
 
-        # Step 4 — Create expense
         expense = Expense(
             user_id=current_user.id,
             category_id=data.category_id,
@@ -161,7 +146,6 @@ class ExpenseService:
         db.add(expense)
         db.flush()
 
-        # Step 5 — Add creator as SharedExpenseUser with is_creator=True
         db.add(
             SharedExpenseUser(
                 expense_id=expense.id,
@@ -172,7 +156,6 @@ class ExpenseService:
             )
         )
 
-        # Step 6 — Add participants
         for user, amount in participants:
             db.add(
                 SharedExpenseUser(
@@ -187,8 +170,6 @@ class ExpenseService:
         db.commit()
         db.refresh(expense)
         return ExpenseService._format_shared_detail(db, expense)
-
-    # ── Update personal expense ───────────────────────────────────
 
     @staticmethod
     def update_expense(
@@ -224,16 +205,11 @@ class ExpenseService:
         db.refresh(expense)
         return ExpenseService._format_personal_detail(expense)
 
-    # ── Update participant status (creator only) ──────────────────
-
     @staticmethod
-    def update_participant_status(
-        db: Session,
-        expense_id: int,
-        participant_id: int,
-        data: SharedExpenseUserUpdate,
-        current_user: User,
+    def update_shared_expense(
+        db: Session, expense_id: int, data: SharedExpenseUpdate, current_user: User
     ) -> dict:
+        # Verify expense exists and current user is creator
         expense = (
             db.query(Expense)
             .filter(
@@ -243,59 +219,112 @@ class ExpenseService:
             )
             .first()
         )
-
         if not expense:
             raise HTTPException(
                 status_code=404,
                 detail="Shared expense not found or you are not the creator",
             )
 
-        participant = (
-            db.query(SharedExpenseUser)
-            .filter(
-                SharedExpenseUser.id == participant_id,
-                SharedExpenseUser.expense_id == expense_id,
+        # Validate new participants if provided
+        if data.users is not None:
+            # Validate all emails exist first before making any changes
+            new_participants = []
+            for entry in data.users:
+                user = db.query(User).filter(User.email == entry.email).first()
+                if not user:
+                    raise HTTPException(
+                        status_code=404,
+                        detail=f"User with email '{entry.email}' not found",
+                    )
+                new_participants.append((user, entry.amount, entry.status))
+
+            # Validate shares add up to total
+            total_amount = data.total_amount or expense.amount
+            my_share = data.my_share
+            if my_share is None:
+                # Get current creator share
+                creator_entry = (
+                    db.query(SharedExpenseUser)
+                    .filter(
+                        SharedExpenseUser.expense_id == expense_id,
+                        SharedExpenseUser.is_creator == True,
+                    )
+                    .first()
+                )
+                my_share = creator_entry.amount if creator_entry else 0
+
+            total_shares = round(my_share + sum(u.amount for u in data.users), 2)
+            if total_shares != round(total_amount, 2):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Shares ({total_shares}) do not match total amount ({total_amount})",
+                )
+
+        # Step 1 — Update expense fields
+        if data.category_id is not None:
+            category = (
+                db.query(Category).filter(Category.id == data.category_id).first()
             )
-            .first()
-        )
+            if not category:
+                raise HTTPException(status_code=404, detail="Category not found")
+            expense.category_id = data.category_id
+        if data.total_amount is not None:
+            expense.amount = data.total_amount
+        if data.description is not None:
+            expense.description = data.description
+        if data.date is not None:
+            expense.date = data.date
 
-        if not participant:
-            raise HTTPException(status_code=404, detail="Participant not found")
+        db.flush()
 
-        # Update status
-        participant.status = data.status
+        # Step 2 — Delete all existing participants and re-add
+        if data.users is not None:
+            db.query(SharedExpenseUser).filter(
+                SharedExpenseUser.expense_id == expense_id
+            ).delete()
+            db.flush()
 
-        # Update amount if provided
-        if data.amount is not None:
-            participant.amount = data.amount
+            # Re-add creator
+            db.add(
+                SharedExpenseUser(
+                    expense_id=expense.id,
+                    user_id=current_user.id,
+                    amount=data.my_share,
+                    status=SharedExpenseStatus.paid,  # creator always paid
+                    is_creator=True,
+                )
+            )
+
+            # Re-add participants
+            for user, amount, status in new_participants:
+                db.add(
+                    SharedExpenseUser(
+                        expense_id=expense.id,
+                        user_id=user.id,
+                        amount=amount,
+                        status=status,
+                        is_creator=False,
+                    )
+                )
 
         db.commit()
         db.refresh(expense)
         return ExpenseService._format_shared_detail(db, expense)
 
-    # ── Delete expense ────────────────────────────────────────────
-
     @staticmethod
     def delete_expense(db: Session, expense_id: int, current_user: User) -> dict:
-        expense = (
-            db.query(Expense)
-            .filter(
-                Expense.id == expense_id,
-            )
-            .first()
-        )
+        expense = db.query(Expense).filter(Expense.id == expense_id).first()
         if not expense:
             raise HTTPException(status_code=404, detail="Expense not found")
-        elif expense.is_shared and expense.user_id != current_user.id:
+        if expense.is_shared and expense.user_id != current_user.id:
             raise HTTPException(
-                status_code=403, detail="Not authorized to delete this shared expense"
+                status_code=403,
+                detail="Not authorized to delete this shared expense",
             )
 
         db.delete(expense)
         db.commit()
         return {"status": "Success", "message": "Expense deleted successfully"}
-
-    # ── Private helpers ───────────────────────────────────────────
 
     @staticmethod
     def _format_personal_detail(expense: Expense) -> dict:
