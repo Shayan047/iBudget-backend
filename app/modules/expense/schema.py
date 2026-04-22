@@ -60,9 +60,19 @@ class SharedExpenseCreate(BaseModel):
     users: List[SharedExpenseUserCreate]
 
 
-class SharedExpenseUserUpdate(BaseModel):
+class SharedExpenseUserUpdateItem(BaseModel):
+    email: EmailStr
+    amount: float
     status: SharedExpenseStatus
-    amount: float | None = None
+
+
+class SharedExpenseUpdate(BaseModel):
+    category_id: int | None = None
+    total_amount: float | None = None
+    my_share: float | None = None
+    description: str | None = None
+    date: datetime | None = None
+    users: List[SharedExpenseUserUpdateItem] | None = None
 
 
 # ── Responses ─────────────────────────────────────────────────

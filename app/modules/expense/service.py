@@ -7,14 +7,13 @@ from app.models import (
     SharedExpenseUser,
     SharedExpenseStatus,
     Category,
-    Tax,
     User,
 )
 from .schema import (
     ExpenseCreate,
     ExpenseUpdate,
     SharedExpenseCreate,
-    SharedExpenseUserUpdate,
+    SharedExpenseUpdate,
 )
 
 
@@ -224,16 +223,13 @@ class ExpenseService:
         db.refresh(expense)
         return ExpenseService._format_personal_detail(expense)
 
-    # ── Update participant status (creator only) ──────────────────
+    # ── Update shared expense ─────────────────────────────────────
 
     @staticmethod
-    def update_participant_status(
-        db: Session,
-        expense_id: int,
-        participant_id: int,
-        data: SharedExpenseUserUpdate,
-        current_user: User,
+    def update_shared_expense(
+        db: Session, expense_id: int, data: SharedExpenseUpdate, current_user: User
     ) -> dict:
+        # Verify expense exists and current user is the creator
         expense = (
             db.query(Expense)
             .filter(
@@ -250,24 +246,88 @@ class ExpenseService:
                 detail="Shared expense not found or you are not the creator",
             )
 
-        participant = (
-            db.query(SharedExpenseUser)
-            .filter(
-                SharedExpenseUser.id == participant_id,
-                SharedExpenseUser.expense_id == expense_id,
+        # Validate all participant emails exist before making any changes
+        new_participants = []
+        if data.users is not None:
+            for entry in data.users:
+                user = db.query(User).filter(User.email == entry.email).first()
+                if not user:
+                    raise HTTPException(
+                        status_code=404,
+                        detail=f"User with email '{entry.email}' not found",
+                    )
+                new_participants.append((user, entry.amount, entry.status))
+
+            # Validate shares add up to total
+            total_amount = (
+                data.total_amount if data.total_amount is not None else expense.amount
             )
-            .first()
-        )
+            my_share = data.my_share
 
-        if not participant:
-            raise HTTPException(status_code=404, detail="Participant not found")
+            if my_share is None:
+                creator_entry = (
+                    db.query(SharedExpenseUser)
+                    .filter(
+                        SharedExpenseUser.expense_id == expense_id,
+                        SharedExpenseUser.is_creator == True,
+                    )
+                    .first()
+                )
+                my_share = creator_entry.amount if creator_entry else 0
 
-        # Update status
-        participant.status = data.status
+            total_shares = round(my_share + sum(u.amount for u in data.users), 2)
+            if total_shares != round(total_amount, 2):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Shares ({total_shares}) do not match total amount ({total_amount})",
+                )
 
-        # Update amount if provided
-        if data.amount is not None:
-            participant.amount = data.amount
+        # Step 1 — Update expense fields
+        if data.category_id is not None:
+            category = (
+                db.query(Category).filter(Category.id == data.category_id).first()
+            )
+            if not category:
+                raise HTTPException(status_code=404, detail="Category not found")
+            expense.category_id = data.category_id
+        if data.total_amount is not None:
+            expense.amount = data.total_amount
+        if data.description is not None:
+            expense.description = data.description
+        if data.date is not None:
+            expense.date = data.date
+
+        db.flush()
+
+        # Step 2 — Delete all existing participants and re-add
+        if data.users is not None:
+            db.query(SharedExpenseUser).filter(
+                SharedExpenseUser.expense_id == expense_id
+            ).delete()
+            db.flush()
+
+            # Re-add creator
+            db.add(
+                SharedExpenseUser(
+                    expense_id=expense.id,
+                    user_id=current_user.id,
+                    amount=data.my_share,
+                    status=SharedExpenseStatus.paid,
+                    is_creator=True,
+                )
+            )
+
+            # Re-add participants
+            for user, amount, status in new_participants:
+                db.add(
+                    SharedExpenseUser(
+                        expense_id=expense.id,
+                        user_id=user.id,
+                        amount=amount,
+                        status=status,
+                        is_creator=False,
+                    )
+                )
 
         db.commit()
         db.refresh(expense)
