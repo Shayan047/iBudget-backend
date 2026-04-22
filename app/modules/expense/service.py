@@ -7,7 +7,6 @@ from app.models import (
     SharedExpenseUser,
     SharedExpenseStatus,
     Category,
-    Tax,
     User,
 )
 from .schema import (

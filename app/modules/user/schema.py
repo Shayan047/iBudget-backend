@@ -1,14 +1,19 @@
-from pydantic import BaseModel, EmailStr
-from typing import List
+from pydantic import BaseModel
+
+
+class UpdateName(BaseModel):
+    name: str
+
+
+class ChangePassword(BaseModel):
+    current_password: str
+    new_password: str
+
 
 class UserResponse(BaseModel):
     id: int
-    email: EmailStr
     name: str
+    email: str
 
     class Config:
         from_attributes = True
-
-
-class UserListResponse(BaseModel):
-    users: List[UserResponse]
