@@ -17,8 +17,6 @@ from .schema import (
 
 router = APIRouter(prefix="/expenses", tags=["Expenses"])
 
-# ── Personal expenses ─────────────────────────────────────────
-
 
 @router.get("/", response_model=List[ExpenseSummaryResponse])
 def get_all_expenses(
@@ -65,9 +63,6 @@ def delete_expense(
     return ExpenseService.delete_expense(db, expense_id, current_user)
 
 
-# ── Shared expenses ───────────────────────────────────────────
-
-
 @router.post("/shared", response_model=ExpenseDetailResponse, status_code=201)
 def create_shared_expense(
     data: SharedExpenseCreate,
@@ -77,6 +72,7 @@ def create_shared_expense(
     return ExpenseService.create_shared_expense(db, data, current_user)
 
 
+# ── New shared expense update endpoint ───────────────────────
 @router.patch("/shared/{expense_id}", response_model=ExpenseDetailResponse)
 def update_shared_expense(
     expense_id: int,
