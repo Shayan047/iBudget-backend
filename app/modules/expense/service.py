@@ -7,6 +7,7 @@ from app.models import (
     SharedExpenseUser,
     SharedExpenseStatus,
     Category,
+    Tax,
     User,
 )
 from .schema import (
@@ -32,18 +33,16 @@ class ExpenseService:
             .all()
         )
         for exp in personal:
-            results.append(
-                {
-                    "id": exp.id,
-                    "description": exp.description,
-                    "my_amount": exp.amount,
-                    "date": exp.date,
-                    "category": exp.category,
-                    "is_shared": False,
-                    "is_creator": None,
-                    "status": None,
-                }
-            )
+            results.append({
+                "id": exp.id,
+                "description": exp.description,
+                "my_amount": exp.amount,
+                "date": exp.date,
+                "category": exp.category,
+                "is_shared": False,
+                "is_creator": None,
+                "status": None,
+            })
 
         shared_entries = (
             db.query(SharedExpenseUser)
@@ -52,18 +51,16 @@ class ExpenseService:
         )
         for entry in shared_entries:
             exp = entry.expense
-            results.append(
-                {
-                    "id": exp.id,
-                    "description": exp.description,
-                    "my_amount": entry.amount,
-                    "date": exp.date,
-                    "category": exp.category,
-                    "is_shared": True,
-                    "is_creator": entry.is_creator,
-                    "status": entry.status,
-                }
-            )
+            results.append({
+                "id": exp.id,
+                "description": exp.description,
+                "my_amount": entry.amount,
+                "date": exp.date,
+                "category": exp.category,
+                "is_shared": True,
+                "is_creator": entry.is_creator,
+                "status": entry.status,
+            })
 
         return results
 
@@ -105,6 +102,13 @@ class ExpenseService:
             is_shared=False,
         )
         db.add(expense)
+        db.flush()
+
+        # Create tax if provided
+        if data.tax_amount is not None:
+            tax = Tax(amount=data.tax_amount, expense_id=expense.id)
+            db.add(tax)
+
         db.commit()
         db.refresh(expense)
         return ExpenseService._format_personal_detail(expense)
@@ -145,26 +149,27 @@ class ExpenseService:
         db.add(expense)
         db.flush()
 
-        db.add(
-            SharedExpenseUser(
-                expense_id=expense.id,
-                user_id=current_user.id,
-                amount=data.my_share,
-                status=SharedExpenseStatus.paid,
-                is_creator=True,
-            )
-        )
+        db.add(SharedExpenseUser(
+            expense_id=expense.id,
+            user_id=current_user.id,
+            amount=data.my_share,
+            status=SharedExpenseStatus.paid,
+            is_creator=True,
+        ))
 
         for user, amount in participants:
-            db.add(
-                SharedExpenseUser(
-                    expense_id=expense.id,
-                    user_id=user.id,
-                    amount=amount,
-                    status=SharedExpenseStatus.pending,
-                    is_creator=False,
-                )
-            )
+            db.add(SharedExpenseUser(
+                expense_id=expense.id,
+                user_id=user.id,
+                amount=amount,
+                status=SharedExpenseStatus.pending,
+                is_creator=False,
+            ))
+
+        # Create tax if provided
+        if data.tax_amount is not None:
+            tax = Tax(amount=data.tax_amount, expense_id=expense.id)
+            db.add(tax)
 
         db.commit()
         db.refresh(expense)
@@ -187,9 +192,7 @@ class ExpenseService:
             raise HTTPException(status_code=404, detail="Expense not found")
 
         if data.category_id is not None:
-            category = (
-                db.query(Category).filter(Category.id == data.category_id).first()
-            )
+            category = db.query(Category).filter(Category.id == data.category_id).first()
             if not category:
                 raise HTTPException(status_code=404, detail="Category not found")
             expense.category_id = data.category_id
@@ -200,6 +203,18 @@ class ExpenseService:
         if data.date is not None:
             expense.date = data.date
 
+        # Handle tax update
+        if data.tax_amount is not None:
+            if expense.tax:
+                # Update existing tax
+                expense.tax.amount = data.tax_amount
+            else:
+                # Create new tax
+                db.add(Tax(amount=data.tax_amount, expense_id=expense.id))
+        elif data.tax_amount == 0 and expense.tax:
+            # tax_amount of 0 means remove the tax
+            db.delete(expense.tax)
+
         db.commit()
         db.refresh(expense)
         return ExpenseService._format_personal_detail(expense)
@@ -208,7 +223,6 @@ class ExpenseService:
     def update_shared_expense(
         db: Session, expense_id: int, data: SharedExpenseUpdate, current_user: User
     ) -> dict:
-        # Verify expense exists and current user is creator
         expense = (
             db.query(Expense)
             .filter(
@@ -224,10 +238,8 @@ class ExpenseService:
                 detail="Shared expense not found or you are not the creator",
             )
 
-        # Validate new participants if provided
+        new_participants = []
         if data.users is not None:
-            # Validate all emails exist first before making any changes
-            new_participants = []
             for entry in data.users:
                 user = db.query(User).filter(User.email == entry.email).first()
                 if not user:
@@ -237,11 +249,9 @@ class ExpenseService:
                     )
                 new_participants.append((user, entry.amount, entry.status))
 
-            # Validate shares add up to total
             total_amount = data.total_amount or expense.amount
             my_share = data.my_share
             if my_share is None:
-                # Get current creator share
                 creator_entry = (
                     db.query(SharedExpenseUser)
                     .filter(
@@ -259,11 +269,8 @@ class ExpenseService:
                     detail=f"Shares ({total_shares}) do not match total amount ({total_amount})",
                 )
 
-        # Step 1 — Update expense fields
         if data.category_id is not None:
-            category = (
-                db.query(Category).filter(Category.id == data.category_id).first()
-            )
+            category = db.query(Category).filter(Category.id == data.category_id).first()
             if not category:
                 raise HTTPException(status_code=404, detail="Category not found")
             expense.category_id = data.category_id
@@ -274,37 +281,39 @@ class ExpenseService:
         if data.date is not None:
             expense.date = data.date
 
+        # Handle tax update
+        if data.tax_amount is not None:
+            if expense.tax:
+                expense.tax.amount = data.tax_amount
+            else:
+                db.add(Tax(amount=data.tax_amount, expense_id=expense.id))
+        elif data.tax_amount == 0 and expense.tax:
+            db.delete(expense.tax)
+
         db.flush()
 
-        # Step 2 — Delete all existing participants and re-add
         if data.users is not None:
             db.query(SharedExpenseUser).filter(
                 SharedExpenseUser.expense_id == expense_id
             ).delete()
             db.flush()
 
-            # Re-add creator
-            db.add(
-                SharedExpenseUser(
-                    expense_id=expense.id,
-                    user_id=current_user.id,
-                    amount=data.my_share,
-                    status=SharedExpenseStatus.paid,  # creator always paid
-                    is_creator=True,
-                )
-            )
+            db.add(SharedExpenseUser(
+                expense_id=expense.id,
+                user_id=current_user.id,
+                amount=data.my_share,
+                status=SharedExpenseStatus.paid,
+                is_creator=True,
+            ))
 
-            # Re-add participants
             for user, amount, status in new_participants:
-                db.add(
-                    SharedExpenseUser(
-                        expense_id=expense.id,
-                        user_id=user.id,
-                        amount=amount,
-                        status=status,
-                        is_creator=False,
-                    )
-                )
+                db.add(SharedExpenseUser(
+                    expense_id=expense.id,
+                    user_id=user.id,
+                    amount=amount,
+                    status=status,
+                    is_creator=False,
+                ))
 
         db.commit()
         db.refresh(expense)
@@ -347,27 +356,29 @@ class ExpenseService:
             .all()
         )
         tax_amount = expense.tax.amount if expense.tax else None
+        total_users = len(participants)  # includes creator
 
         participant_list = []
         for p in participants:
             user = db.query(User).filter(User.id == p.user_id).first()
+
+            # Equal split: tax / total number of users (not proportional)
             participant_tax = (
-                round((p.amount / expense.amount) * tax_amount, 2)
-                if tax_amount
+                round(tax_amount / total_users, 2)
+                if tax_amount and total_users > 0
                 else None
             )
-            participant_list.append(
-                {
-                    "id": p.id,
-                    "user_id": p.user_id,
-                    "user_name": user.name if user else None,
-                    "user_email": user.email if user else None,
-                    "amount": p.amount,
-                    "tax_amount": participant_tax,
-                    "status": p.status,
-                    "is_creator": p.is_creator,
-                }
-            )
+
+            participant_list.append({
+                "id": p.id,
+                "user_id": p.user_id,
+                "user_name": user.name if user else None,
+                "user_email": user.email if user else None,
+                "amount": p.amount,
+                "tax_amount": participant_tax,
+                "status": p.status,
+                "is_creator": p.is_creator,
+            })
 
         return {
             "id": expense.id,

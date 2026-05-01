@@ -34,6 +34,7 @@ class ExpenseCreate(BaseModel):
     amount: float
     description: str | None = None
     date: datetime | None = None
+    tax_amount: float | None = None
 
 
 class ExpenseUpdate(BaseModel):
@@ -41,6 +42,7 @@ class ExpenseUpdate(BaseModel):
     amount: float | None = None
     description: str | None = None
     date: datetime | None = None
+    tax_amount: float | None = None
 
 
 # ── Shared expense ────────────────────────────────────────────
@@ -57,6 +59,7 @@ class SharedExpenseCreate(BaseModel):
     my_share: float
     description: str | None = None
     date: datetime | None = None
+    tax_amount: float | None = None
     users: List[SharedExpenseUserCreate]
 
 
@@ -72,6 +75,7 @@ class SharedExpenseUpdate(BaseModel):
     my_share: float | None = None
     description: str | None = None
     date: datetime | None = None
+    tax_amount: float | None = None
     users: List[SharedExpenseUserUpdateItem] | None = None
 
 
