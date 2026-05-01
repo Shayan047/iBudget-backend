@@ -5,7 +5,7 @@ from app.database import get_db
 from app.models import User
 from app.dependencies import get_current_user
 from .service import TaxService
-from .schema import TaxCreate, TaxResponse
+from .schema import TaxResponse
 
 router = APIRouter(prefix="/taxes", tags=["Taxes"])
 
@@ -25,15 +25,6 @@ def get_tax(
     current_user: User = Depends(get_current_user),
 ):
     return TaxService.get_tax_by_id(db, tax_id, current_user)
-
-
-@router.post("/", response_model=TaxResponse, status_code=201)
-def create_tax(
-    data: TaxCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    return TaxService.create_tax(db, data, current_user)
 
 
 @router.delete("/{tax_id}", status_code=204)

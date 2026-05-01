@@ -8,6 +8,7 @@ from app.modules.auth.api import router as auth_router
 from app.modules.dashboard.api import router as dashboard_router
 from app.modules.chat_agent.api import router as budgetbot_router
 from app.modules.user.api import router as user_router
+from app.modules.tax.api import router as tax_router
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(
@@ -34,6 +35,7 @@ app.include_router(budget_router)
 app.include_router(dashboard_router)
 app.include_router(budgetbot_router)
 app.include_router(user_router)
+app.include_router(tax_router)
 
 
 @app.get("/")

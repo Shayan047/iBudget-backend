@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from enum import Enum
 
 from sqlalchemy import (
@@ -83,7 +83,7 @@ class Budget(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     amount: Mapped[float] = mapped_column(Float, nullable=False)
-    date: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    date: Mapped[date] = mapped_column(DateTime, default=date.today)
 
     user: Mapped["User"] = relationship(back_populates="budgets")
 
