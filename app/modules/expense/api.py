@@ -72,7 +72,6 @@ def create_shared_expense(
     return ExpenseService.create_shared_expense(db, data, current_user)
 
 
-# ── New shared expense update endpoint ───────────────────────
 @router.patch("/shared/{expense_id}", response_model=ExpenseDetailResponse)
 def update_shared_expense(
     expense_id: int,

@@ -12,8 +12,9 @@ class TaxResponse(BaseModel):
     amount: float
     expense_id: int | None
     income_id: int | None
-    is_derived: bool = False  # True = participant's calculated tax
-    my_tax_amount: float | None  # participant's share of the tax
+    is_derived: bool = False
+    my_tax_amount: float | None
+    description: str | None = None
 
     class Config:
         from_attributes = True

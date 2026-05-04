@@ -15,11 +15,9 @@ def build_vector_db():
         shutil.rmtree(VECTOR_DB_PATH)
         print("Existing vector DB cleared.")
 
-    # Step 1 — Load the document
     loader = TextLoader(KNOWLEDGE_PATH)
     documents = loader.load()
 
-    # Step 2 — Split by markdown headers so each section is a chunk
     splitter = MarkdownHeaderTextSplitter(
         headers_to_split_on=[
             ("#", "Header 1"),
@@ -29,10 +27,8 @@ def build_vector_db():
     )
     chunks = splitter.split_text(documents[0].page_content)
 
-    # Step 3 — Create embeddings model (runs locally, free)
     embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 
-    # Step 4 — Store chunks + their embeddings in ChromaDB
     vector_db = Chroma.from_documents(
         documents=chunks,
         embedding=embeddings,

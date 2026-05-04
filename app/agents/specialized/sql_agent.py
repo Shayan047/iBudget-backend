@@ -11,7 +11,6 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 def get_sql_agent():
     """
     Build and cache the SQL agent.
-    lru_cache ensures this runs once — not on every request.
     """
     groq_api_key = os.getenv("GROQ_API_KEY")
     if not groq_api_key:
@@ -27,11 +26,9 @@ def get_sql_agent():
 
     agent_prompt_template = ChatPromptTemplate.from_messages(
         [
-            ("system", SQL_AGENT_SYSTEM_PROMPT),  # Your rules and context
-            ("human", "{input}"),  # Where the user's actual question goes
-            MessagesPlaceholder(
-                variable_name="agent_scratchpad"
-            ),  # The required space for the agent to "think"
+            ("system", SQL_AGENT_SYSTEM_PROMPT),
+            ("human", "{input}"),
+            MessagesPlaceholder(variable_name="agent_scratchpad"),
         ]
     )
 
