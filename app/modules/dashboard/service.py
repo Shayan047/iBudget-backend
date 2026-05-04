@@ -19,7 +19,7 @@ class DashboardService:
         )
         total_income = sum(i.amount for i in incomes)
 
-        # Budget
+        # Budget for this month
         budget = (
             db.query(Budget)
             .filter(
@@ -44,7 +44,7 @@ class DashboardService:
             .all()
         )
 
-        # Shared expense entries for this month (creator + participant)
+        # Shared expense entries for this month
         shared_entries = (
             db.query(SharedExpenseUser)
             .filter(
@@ -56,7 +56,6 @@ class DashboardService:
             .all()
         )
 
-        # Build expense list
         expense_items = []
 
         for exp in personal_expenses:

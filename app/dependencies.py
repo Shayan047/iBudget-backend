@@ -9,7 +9,9 @@ from app.utils.jwt import decode_token
 security = HTTPBearer()
 
 
-def get_current_user(token: str = Depends(security), db: Session = Depends(get_db)) -> User:
+def get_current_user(
+    token: str = Depends(security), db: Session = Depends(get_db)
+) -> User:
     try:
         user_id = decode_token(token.credentials)
         user = db.query(User).filter(User.id == user_id).first()
@@ -18,6 +20,5 @@ def get_current_user(token: str = Depends(security), db: Session = Depends(get_d
         return user
     except Exception:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token"
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token"
         )

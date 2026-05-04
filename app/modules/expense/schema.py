@@ -4,9 +4,6 @@ from typing import List
 from app.models import SharedExpenseStatus
 
 
-# ── Category ──────────────────────────────────────────────────
-
-
 class CategoryResponse(BaseModel):
     id: int
     name: str
@@ -15,18 +12,12 @@ class CategoryResponse(BaseModel):
         from_attributes = True
 
 
-# ── Tax ───────────────────────────────────────────────────────
-
-
 class TaxResponse(BaseModel):
     id: int
     amount: float
 
     class Config:
         from_attributes = True
-
-
-# ── Personal expense ──────────────────────────────────────────
 
 
 class ExpenseCreate(BaseModel):
@@ -43,9 +34,6 @@ class ExpenseUpdate(BaseModel):
     description: str | None = None
     date: datetime | None = None
     tax_amount: float | None = None
-
-
-# ── Shared expense ────────────────────────────────────────────
 
 
 class SharedExpenseUserCreate(BaseModel):

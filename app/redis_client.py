@@ -9,7 +9,7 @@ redis_client = redis.Redis(
     decode_responses=True,
 )
 
-SESSION_TTL = 60 * 60 * 24  # 24 hours in seconds
+SESSION_TTL = 60 * 60 * 24
 SESSION_KEY_PREFIX = "chat_session:"
 
 

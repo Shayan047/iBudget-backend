@@ -9,7 +9,6 @@ class TaxService:
     def get_all_taxes(db: Session, current_user: User) -> list:
         results = []
 
-        # 1. Taxes from user's own personal expenses
         expense_taxes = (
             db.query(Tax)
             .join(Expense, Tax.expense_id == Expense.id)
@@ -20,16 +19,19 @@ class TaxService:
             .all()
         )
         for tax in expense_taxes:
-            results.append({
-                "id": tax.id,
-                "amount": tax.amount,
-                "expense_id": tax.expense_id,
-                "income_id": None,
-                "is_derived": False,
-                "my_tax_amount": tax.amount,
-            })
+            expense = db.query(Expense).filter(Expense.id == tax.expense_id).first()
+            results.append(
+                {
+                    "id": tax.id,
+                    "amount": tax.amount,
+                    "expense_id": tax.expense_id,
+                    "income_id": None,
+                    "is_derived": False,
+                    "my_tax_amount": tax.amount,
+                    "description": expense.description if expense else None,
+                }
+            )
 
-        # 2. Taxes from shared expenses (creator or participant)
         shared_entries = (
             db.query(SharedExpenseUser)
             .filter(SharedExpenseUser.user_id == current_user.id)
@@ -39,23 +41,24 @@ class TaxService:
             expense = entry.expense
             if expense and expense.tax:
                 tax = expense.tax
-                # Count total participants (including creator) for equal split
                 total_users = (
                     db.query(SharedExpenseUser)
                     .filter(SharedExpenseUser.expense_id == expense.id)
                     .count()
                 )
                 my_tax = round(tax.amount / total_users, 2) if total_users > 0 else 0
-                results.append({
-                    "id": tax.id,
-                    "amount": tax.amount,
-                    "expense_id": expense.id,
-                    "income_id": None,
-                    "is_derived": not entry.is_creator,
-                    "my_tax_amount": my_tax,
-                })
+                results.append(
+                    {
+                        "id": tax.id,
+                        "amount": tax.amount,
+                        "expense_id": expense.id,
+                        "income_id": None,
+                        "is_derived": not entry.is_creator,
+                        "my_tax_amount": my_tax,
+                        "description": expense.description,
+                    }
+                )
 
-        # 3. Taxes from user's incomes
         income_taxes = (
             db.query(Tax)
             .join(Income, Tax.income_id == Income.id)
@@ -63,14 +66,18 @@ class TaxService:
             .all()
         )
         for tax in income_taxes:
-            results.append({
-                "id": tax.id,
-                "amount": tax.amount,
-                "expense_id": None,
-                "income_id": tax.income_id,
-                "is_derived": False,
-                "my_tax_amount": tax.amount,
-            })
+            income = db.query(Income).filter(Income.id == tax.income_id).first()
+            results.append(
+                {
+                    "id": tax.id,
+                    "amount": tax.amount,
+                    "expense_id": None,
+                    "income_id": tax.income_id,
+                    "is_derived": False,
+                    "my_tax_amount": tax.amount,
+                    "description": income.description if income else None,
+                }
+            )
 
         return results
 
@@ -95,10 +102,14 @@ class TaxService:
                 raise HTTPException(status_code=403, detail="Not authorized")
 
         if tax.income_id:
-            income = db.query(Income).filter(
-                Income.id == tax.income_id,
-                Income.user_id == current_user.id,
-            ).first()
+            income = (
+                db.query(Income)
+                .filter(
+                    Income.id == tax.income_id,
+                    Income.user_id == current_user.id,
+                )
+                .first()
+            )
             if not income:
                 raise HTTPException(status_code=403, detail="Not authorized")
 
