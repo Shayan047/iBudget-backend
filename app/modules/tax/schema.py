@@ -1,4 +1,6 @@
 from pydantic import BaseModel
+from app.utils.pagination import PaginationMeta
+from typing import List
 
 
 class TaxCreate(BaseModel):
@@ -18,3 +20,8 @@ class TaxResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class PaginatedTaxResponse(BaseModel):
+    data: List[TaxResponse]
+    pagination: PaginationMeta

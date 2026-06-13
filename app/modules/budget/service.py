@@ -2,19 +2,38 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException
 
 from app.models import Budget, User
+from app.utils.pagination import PaginationMeta
 from .schema import BudgetCreate, BudgetUpdate
 
 
 class BudgetService:
 
     @staticmethod
-    def get_all_budgets(db: Session, current_user: User) -> list[Budget]:
-        return (
+    def get_all_budgets(db: Session, current_user: User, page: int, limit: int):
+        offset = (page - 1) * limit
+
+        total = db.query(Budget).filter(Budget.user_id == current_user.id).count()
+
+        budgets = (
             db.query(Budget)
             .filter(Budget.user_id == current_user.id)
             .order_by(Budget.date)
+            .offset(offset)
+            .limit(limit)
             .all()
         )
+
+        return {
+            "data": budgets,
+            "pagination": PaginationMeta(
+                page=page,
+                limit=limit,
+                total=total,
+                total_pages=-(-total // limit),
+                has_next=offset + limit < total,
+                has_prev=page > 1,
+            ),
+        }
 
     @staticmethod
     def get_budget_by_id(db: Session, budget_id: int, current_user: User) -> Budget:

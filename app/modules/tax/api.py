@@ -1,21 +1,22 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from typing import List
 from app.database import get_db
 from app.models import User
 from app.dependencies import get_current_user
 from .service import TaxService
-from .schema import TaxResponse
+from .schema import TaxResponse, PaginatedTaxResponse
 
 router = APIRouter(prefix="/taxes", tags=["Taxes"])
 
 
-@router.get("/", response_model=List[TaxResponse])
+@router.get("/", response_model=PaginatedTaxResponse)
 def get_all_taxes(
+    page: int = 1,
+    limit: int = 20,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return TaxService.get_all_taxes(db, current_user)
+    return TaxService.get_all_taxes(db, current_user, page, limit)
 
 
 @router.get("/{tax_id}", response_model=TaxResponse)

@@ -1,6 +1,8 @@
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from datetime import datetime
+from app.utils.pagination import PaginationMeta
 
 from app.models import (
     Expense,
@@ -21,54 +23,91 @@ from .schema import (
 class ExpenseService:
 
     @staticmethod
-    def get_all_expenses(db: Session, current_user: User) -> list:
-        results = []
+    def get_all_expenses(db: Session, current_user: User, page: int, limit: int):
+        offset = (page - 1) * limit
 
-        personal = (
-            db.query(Expense)
-            .filter(
-                Expense.user_id == current_user.id,
-                Expense.is_shared == False,
+        query = text("""
+            SELECT 
+                e.id,
+                e.description,
+                e.amount AS my_amount,
+                e.date,
+                e.is_shared,
+                FALSE AS is_creator,
+                NULL AS status,
+                c.id AS category_id,
+                c.name AS category_name
+            FROM expenses e
+            LEFT JOIN categories c ON c.id = e.category_id
+            WHERE e.user_id = :user_id
+            AND e.is_shared = FALSE
+
+            UNION ALL
+
+            SELECT 
+                e.id,
+                e.description,
+                seu.amount AS my_amount,
+                e.date,
+                TRUE AS is_shared,
+                seu.is_creator,
+                seu.status,
+                c.id AS category_id,
+                c.name AS category_name
+            FROM shared_expense_users seu
+            JOIN expenses e ON e.id = seu.expense_id
+            LEFT JOIN categories c ON c.id = e.category_id
+            WHERE seu.user_id = :user_id
+
+            ORDER BY date ASC
+            LIMIT :limit OFFSET :offset
+        """)
+
+        count_query = text("""
+            SELECT COUNT(*) FROM (
+                SELECT e.id FROM expenses e
+                WHERE e.user_id = :user_id AND e.is_shared = FALSE
+
+                UNION ALL
+
+                SELECT e.id FROM shared_expense_users seu
+                JOIN expenses e ON e.id = seu.expense_id
+                WHERE seu.user_id = :user_id
+            ) AS total
+        """)
+
+        rows = (
+            db.execute(
+                query, {"user_id": current_user.id, "limit": limit, "offset": offset}
             )
+            .mappings()
             .all()
         )
-        for exp in personal:
-            results.append(
-                {
-                    "id": exp.id,
-                    "description": exp.description,
-                    "my_amount": exp.amount,
-                    "date": exp.date,
-                    "category": exp.category,
-                    "is_shared": False,
-                    "is_creator": None,
-                    "status": None,
-                }
+
+        total = db.execute(count_query, {"user_id": current_user.id}).scalar()
+
+        data = []
+        for row in rows:
+            row = dict(row)
+            # Reconstruct category object from flat SQL columns
+            row["category"] = (
+                {"id": row.pop("category_id"), "name": row.pop("category_name")}
+                if row.get("category_name")
+                else None
             )
+            data.append(row)
 
-        shared_entries = (
-            db.query(SharedExpenseUser)
-            .filter(SharedExpenseUser.user_id == current_user.id)
-            .all()
-        )
-        for entry in shared_entries:
-            exp = entry.expense
-            results.append(
-                {
-                    "id": exp.id,
-                    "description": exp.description,
-                    "my_amount": entry.amount,
-                    "date": exp.date,
-                    "category": exp.category,
-                    "is_shared": True,
-                    "is_creator": entry.is_creator,
-                    "status": entry.status,
-                }
-            )
-
-        results.sort(key=lambda x: x["date"], reverse=False)
-
-        return results
+        return {
+            "data": data,
+            "pagination": PaginationMeta(
+                page=page,
+                limit=limit,
+                total=total,
+                total_pages=-(-total // limit),
+                has_next=offset + limit < total,
+                has_prev=page > 1,
+            ),
+        }
 
     @staticmethod
     def get_expense_by_id(db: Session, expense_id: int, current_user: User) -> dict:

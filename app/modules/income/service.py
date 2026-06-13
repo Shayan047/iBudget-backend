@@ -3,19 +3,38 @@ from fastapi import HTTPException
 from datetime import datetime
 
 from app.models import Income, Tax, User
+from app.utils.pagination import PaginationMeta
 from .schema import IncomeCreate, IncomeUpdate
 
 
 class IncomeService:
 
     @staticmethod
-    def get_all_incomes(db: Session, current_user: User) -> list[Income]:
-        return (
+    def get_all_incomes(db: Session, current_user: User, page: int, limit: int):
+        offset = (page - 1) * limit
+
+        total = db.query(Income).filter(Income.user_id == current_user.id).count()
+
+        incomes = (
             db.query(Income)
             .filter(Income.user_id == current_user.id)
             .order_by(Income.date.desc())
+            .offset(offset)
+            .limit(limit)
             .all()
         )
+
+        return {
+            "data": incomes,
+            "pagination": PaginationMeta(
+                page=page,
+                limit=limit,
+                total=total,
+                total_pages=-(-total // limit),
+                has_next=offset + limit < total,
+                has_prev=page > 1,
+            ),
+        }
 
     @staticmethod
     def get_income_by_id(db: Session, income_id: int, current_user: User) -> Income:

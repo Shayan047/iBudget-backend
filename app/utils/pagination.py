@@ -1,0 +1,19 @@
+# app/utils/pagination.py
+from pydantic import BaseModel
+from typing import Generic, TypeVar, List
+
+T = TypeVar("T")
+
+
+class PaginationMeta(BaseModel):
+    page: int
+    limit: int
+    total: int
+    total_pages: int
+    has_next: bool
+    has_prev: bool
+
+
+class PaginatedResponse(BaseModel, Generic[T]):
+    data: List[T]
+    pagination: PaginationMeta

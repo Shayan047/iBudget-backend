@@ -11,19 +11,21 @@ from .schema import (
     ExpenseUpdate,
     SharedExpenseCreate,
     SharedExpenseUpdate,
-    ExpenseSummaryResponse,
+    PaginatedExpenseResponse,
     ExpenseDetailResponse,
 )
 
 router = APIRouter(prefix="/expenses", tags=["Expenses"])
 
 
-@router.get("/", response_model=List[ExpenseSummaryResponse])
+@router.get("/", response_model=PaginatedExpenseResponse)
 def get_all_expenses(
+    page: int = 1,
+    limit: int = 20,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return ExpenseService.get_all_expenses(db, current_user)
+    return ExpenseService.get_all_expenses(db, current_user, page, limit)
 
 
 @router.get("/{expense_id}", response_model=ExpenseDetailResponse)
