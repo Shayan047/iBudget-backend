@@ -1,85 +1,111 @@
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from app.models import Tax, Expense, Income, SharedExpenseUser, User
+from sqlalchemy import text
+from app.utils.pagination import PaginationMeta
 
 
 class TaxService:
 
     @staticmethod
-    def get_all_taxes(db: Session, current_user: User) -> list:
-        results = []
+    def get_all_taxes(db: Session, current_user: User, page: int, limit: int):
+        offset = (page - 1) * limit
 
-        expense_taxes = (
-            db.query(Tax)
-            .join(Expense, Tax.expense_id == Expense.id)
-            .filter(
-                Expense.user_id == current_user.id,
-                Expense.is_shared == False,
+        # Single query for all 3 tax types
+        # Window function COUNT() OVER (PARTITION BY) counts shared users
+        # per expense inside the query itself — no extra round trips
+        query = text("""
+            SELECT
+                t.id,
+                t.amount,
+                t.expense_id,
+                NULL::int AS income_id,
+                FALSE AS is_derived,
+                t.amount AS my_tax_amount,
+                e.description
+            FROM taxes t
+            JOIN expenses e ON e.id = t.expense_id
+            WHERE e.user_id = :user_id
+            AND e.is_shared = FALSE
+
+            UNION ALL
+
+            SELECT
+                t.id,
+                t.amount,
+                t.expense_id,
+                NULL::int AS income_id,
+                (NOT seu.is_creator) AS is_derived,
+                -- window function: count users in this shared expense in one pass
+                ROUND(
+                    t.amount / COUNT(seu.id) OVER (PARTITION BY e.id)
+                , 2) AS my_tax_amount,
+                e.description
+            FROM shared_expense_users seu
+            JOIN expenses e ON e.id = seu.expense_id
+            JOIN taxes t ON t.expense_id = e.id
+            WHERE seu.user_id = :user_id
+
+            UNION ALL
+
+            SELECT
+                t.id,
+                t.amount,
+                NULL::int AS expense_id,
+                t.income_id,
+                FALSE AS is_derived,
+                t.amount AS my_tax_amount,
+                i.description
+            FROM taxes t
+            JOIN incomes i ON i.id = t.income_id
+            WHERE i.user_id = :user_id
+
+            ORDER BY id ASC
+            LIMIT :limit OFFSET :offset
+        """)
+
+        count_query = text("""
+            SELECT COUNT(*) FROM (
+                SELECT t.id FROM taxes t
+                JOIN expenses e ON e.id = t.expense_id
+                WHERE e.user_id = :user_id AND e.is_shared = FALSE
+
+                UNION ALL
+
+                SELECT t.id FROM shared_expense_users seu
+                JOIN expenses e ON e.id = seu.expense_id
+                JOIN taxes t ON t.expense_id = e.id
+                WHERE seu.user_id = :user_id
+
+                UNION ALL
+
+                SELECT t.id FROM taxes t
+                JOIN incomes i ON i.id = t.income_id
+                WHERE i.user_id = :user_id
+            ) AS total
+        """)
+
+        rows = (
+            db.execute(
+                query, {"user_id": current_user.id, "limit": limit, "offset": offset}
             )
+            .mappings()
             .all()
         )
-        for tax in expense_taxes:
-            expense = db.query(Expense).filter(Expense.id == tax.expense_id).first()
-            results.append(
-                {
-                    "id": tax.id,
-                    "amount": tax.amount,
-                    "expense_id": tax.expense_id,
-                    "income_id": None,
-                    "is_derived": False,
-                    "my_tax_amount": tax.amount,
-                    "description": expense.description if expense else None,
-                }
-            )
 
-        shared_entries = (
-            db.query(SharedExpenseUser)
-            .filter(SharedExpenseUser.user_id == current_user.id)
-            .all()
-        )
-        for entry in shared_entries:
-            expense = entry.expense
-            if expense and expense.tax:
-                tax = expense.tax
-                total_users = (
-                    db.query(SharedExpenseUser)
-                    .filter(SharedExpenseUser.expense_id == expense.id)
-                    .count()
-                )
-                my_tax = round(tax.amount / total_users, 2) if total_users > 0 else 0
-                results.append(
-                    {
-                        "id": tax.id,
-                        "amount": tax.amount,
-                        "expense_id": expense.id,
-                        "income_id": None,
-                        "is_derived": not entry.is_creator,
-                        "my_tax_amount": my_tax,
-                        "description": expense.description,
-                    }
-                )
+        total = db.execute(count_query, {"user_id": current_user.id}).scalar()
 
-        income_taxes = (
-            db.query(Tax)
-            .join(Income, Tax.income_id == Income.id)
-            .filter(Income.user_id == current_user.id)
-            .all()
-        )
-        for tax in income_taxes:
-            income = db.query(Income).filter(Income.id == tax.income_id).first()
-            results.append(
-                {
-                    "id": tax.id,
-                    "amount": tax.amount,
-                    "expense_id": None,
-                    "income_id": tax.income_id,
-                    "is_derived": False,
-                    "my_tax_amount": tax.amount,
-                    "description": income.description if income else None,
-                }
-            )
-
-        return results
+        return {
+            "data": [dict(row) for row in rows],
+            "pagination": PaginationMeta(
+                page=page,
+                limit=limit,
+                total=total,
+                total_pages=-(-total // limit),
+                has_next=offset + limit < total,
+                has_prev=page > 1,
+            ),
+        }
 
     @staticmethod
     def get_tax_by_id(db: Session, tax_id: int, current_user: User) -> Tax:

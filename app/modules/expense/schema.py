@@ -2,6 +2,8 @@ from pydantic import BaseModel, EmailStr
 from datetime import datetime
 from typing import List
 from app.models import SharedExpenseStatus
+from app.utils.pagination import PaginatedResponse, PaginationMeta
+from typing import List
 
 
 class CategoryResponse(BaseModel):
@@ -93,6 +95,11 @@ class ExpenseSummaryResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class PaginatedExpenseResponse(BaseModel):
+    data: List[ExpenseSummaryResponse]
+    pagination: PaginationMeta
 
 
 class ExpenseDetailResponse(BaseModel):

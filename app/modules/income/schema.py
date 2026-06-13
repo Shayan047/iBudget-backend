@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
+from app.utils.pagination import PaginationMeta
 
 
 class TaxResponse(BaseModel):
@@ -35,3 +36,8 @@ class IncomeResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class PaginatedIncomeResponse(BaseModel):
+    data: List[IncomeResponse]
+    pagination: PaginationMeta

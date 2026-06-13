@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import extract
+from sqlalchemy import extract, text
 from app.models import Income, Expense, Budget, Category, SharedExpenseUser, User
 
 
@@ -32,58 +32,54 @@ class DashboardService:
         )
         budget_amount = budget.amount if budget else 0.0
 
-        # Personal expenses for this month
-        personal_expenses = (
-            db.query(Expense)
-            .filter(
-                Expense.user_id == current_user.id,
-                Expense.is_shared == False,
-                extract("month", Expense.date) == month,
-                extract("year", Expense.date) == year,
+        # Replace the personal_expenses + shared_entries queries with this single query
+        recent_expenses_query = text("""
+            SELECT 
+                e.id,
+                e.description,
+                e.amount,
+                e.amount AS my_amount,
+                e.date,
+                c.name AS category_name,
+                FALSE AS is_shared
+            FROM expenses e
+            LEFT JOIN categories c ON c.id = e.category_id
+            WHERE e.user_id = :user_id
+            AND e.is_shared = FALSE
+            AND EXTRACT(MONTH FROM e.date) = :month
+            AND EXTRACT(YEAR FROM e.date) = :year
+
+            UNION ALL
+
+            SELECT 
+                e.id,
+                e.description,
+                e.amount,
+                seu.amount AS my_amount,
+                e.date,
+                c.name AS category_name,
+                TRUE AS is_shared
+            FROM shared_expense_users seu
+            JOIN expenses e ON e.id = seu.expense_id
+            LEFT JOIN categories c ON c.id = e.category_id
+            WHERE seu.user_id = :user_id
+            AND EXTRACT(MONTH FROM e.date) = :month
+            AND EXTRACT(YEAR FROM e.date) = :year
+
+            ORDER BY date DESC
+            LIMIT 10
+        """)
+
+        rows = (
+            db.execute(
+                recent_expenses_query,
+                {"user_id": current_user.id, "month": month, "year": year},
             )
+            .mappings()
             .all()
         )
 
-        # Shared expense entries for this month
-        shared_entries = (
-            db.query(SharedExpenseUser)
-            .filter(
-                SharedExpenseUser.user_id == current_user.id,
-                extract("month", Expense.date) == month,
-                extract("year", Expense.date) == year,
-            )
-            .join(Expense, SharedExpenseUser.expense_id == Expense.id)
-            .all()
-        )
-
-        expense_items = []
-
-        for exp in personal_expenses:
-            expense_items.append(
-                {
-                    "id": exp.id,
-                    "amount": exp.amount,
-                    "my_amount": exp.amount,
-                    "date": exp.date,
-                    "category_name": exp.category.name if exp.category else None,
-                    "is_shared": False,
-                }
-            )
-
-        for entry in shared_entries:
-            exp = entry.expense
-            expense_items.append(
-                {
-                    "id": exp.id,
-                    "description": exp.description,
-                    "amount": exp.amount,
-                    "my_amount": entry.amount,
-                    "date": exp.date,
-                    "category_name": exp.category.name if exp.category else None,
-                    "is_shared": True,
-                }
-            )
-
+        expense_items = [dict(row) for row in rows]
         total_expenses = sum(e["my_amount"] for e in expense_items)
 
         return {

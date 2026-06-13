@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from datetime import datetime
 from typing import List, Optional
+from app.utils.pagination import PaginationMeta
 
 
 class BudgetCreate(BaseModel):
@@ -23,5 +24,6 @@ class BudgetResponse(BaseModel):
         from_attributes = True
 
 
-class BudgetListResponse(BaseModel):
-    budgets: List[BudgetResponse]
+class PaginatedBudgetResponse(BaseModel):
+    data: List[BudgetResponse]
+    pagination: PaginationMeta

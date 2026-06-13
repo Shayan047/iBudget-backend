@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from .schema import IncomeCreate, IncomeUpdate, IncomeResponse
+from .schema import IncomeCreate, IncomeUpdate, IncomeResponse, PaginatedIncomeResponse
 from .service import IncomeService
 from app.models import User
 from app.dependencies import get_current_user
@@ -10,12 +10,14 @@ from app.dependencies import get_current_user
 router = APIRouter(prefix="/incomes", tags=["Incomes"])
 
 
-@router.get("/", response_model=list[IncomeResponse])
+@router.get("/", response_model=PaginatedIncomeResponse)
 def get_all_incomes(
+    page: int = 1,
+    limit: int = 20,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return IncomeService.get_all_incomes(db, current_user)
+    return IncomeService.get_all_incomes(db, current_user, page, limit)
 
 
 @router.post("/", response_model=IncomeResponse, status_code=201)
